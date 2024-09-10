@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from config import app, db, api
 from models import User, Recipe
 
+
 class Signup(Resource):
     def post(self):
         data = request.get_json()
@@ -15,7 +16,6 @@ class Signup(Resource):
                 username=data.get('username'),
                 image_url=data.get('image_url'),
                 bio=data.get('bio'),
-
             )
             new_user.password_hash = data.get('password')
 
@@ -24,18 +24,12 @@ class Signup(Resource):
 
             session['user_id'] = new_user.id
             return make_response(new_user.to_dict(), 201)
+        
         except AssertionError as e:
-            # This will catch the username validation error
             return make_response({'message': str(e)}, 422)
-        except ValueError as e:
-            # This will catch other validation errors, like instructions length
-            return make_response({'message': str(e)}, 422)
-        except IntegrityError:
-            db.session.rollback()
-            return make_response({'message': 'Username already exists'}, 422)
-        except Exception as e:
-            db.session.rollback()
-            return make_response({'message': 'An error occurred'}, 500)
+        
+api.add_resource(Signup, '/signup', endpoint='signup')
+
 
 class CheckSession(Resource):
     def get(self):
@@ -48,6 +42,9 @@ class CheckSession(Resource):
                 return make_response({'error': 'User not found'}, 404)
         return make_response({'error': 'Unauthorized'}, 401)
 
+api.add_resource(CheckSession, '/check_session', endpoint='check_session')
+
+
 class Login(Resource):
     def post(self):
         data = request.get_json()
@@ -59,7 +56,9 @@ class Login(Resource):
             session['user_id'] = user.id
             return make_response(user.to_dict(), 200)
         else:
-            return make_response({"message": 'Wrong password'}, 401)
+            return make_response({"message": 'incorrect password'}, 401)
+
+api.add_resource(Login, '/login', endpoint='login')
 
 
 class Logout(Resource):
@@ -70,14 +69,16 @@ class Logout(Resource):
         else:
             return make_response({'error': 'not logged in'}, 401)
 
+api.add_resource(Logout, '/logout', endpoint='logout')
+
 
 class RecipeIndex(Resource):
     def get(self):
         user_id = session.get('user_id')
         if not user_id:
-            return make_response({'error': 'Unauthorized'}, 401)
+            return make_response({'error': 'unauthorized'}, 401)
 
-        user = User.query.get(user_id)
+        user = db.session.get(User, user_id)
         if not user:
             return make_response({'error': 'User not found'}, 404)
 
@@ -87,7 +88,7 @@ class RecipeIndex(Resource):
     def post(self):
         user_id = session.get('user_id')
         if not user_id:
-            return make_response({'error': 'Unauthorized'}, 401)
+            return make_response({'error': 'unauthorized'}, 401)
 
         data = request.get_json()
         try:
@@ -101,20 +102,17 @@ class RecipeIndex(Resource):
             db.session.commit()
             return make_response(new_recipe.to_dict(), 201)
         except KeyError as e:
-            return make_response({'error': f'Missing required field: {str(e)}'}, 400)
+            return make_response({'error': f'missing required field: {str(e)}'}, 400)
         except ValueError as e:
             return make_response({'error': str(e)}, 422)
         except IntegrityError:
             db.session.rollback()
-            return make_response({'error': 'Failed to create recipe'}, 422)
+            return make_response({'error': 'failed to create recipe'}, 422)
         except Exception as e:
             db.session.rollback()
-            return make_response({'error': 'An unexpected error occurred'}, 500)
+            return make_response({'error': 'an unexpected error occurred'}, 500)
 
-api.add_resource(Signup, '/signup', endpoint='signup')
-api.add_resource(CheckSession, '/check_session', endpoint='check_session')
-api.add_resource(Login, '/login', endpoint='login')
-api.add_resource(Logout, '/logout', endpoint='logout')
+
 api.add_resource(RecipeIndex, '/recipes', endpoint='recipes')
 
 
